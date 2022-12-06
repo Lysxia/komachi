@@ -105,8 +105,8 @@ record ∃-shortest (P : List Token → Set) : Set where
 
 open ∃-shortest
 
-_·ᴿ_ : Lang A → Lang B → Lang (A × B)
-(R ·ᴿ S) xs (y₁ , y₂) = ∃-shortest λ xs₁ → ∃[ xs₂ ] xs₁ ++ xs₂ ≡ xs × R xs₁ y₁ × S xs₂ y₂ 
+_<,>ᴿ_ : Lang A → Lang B → Lang (A × B)
+(R <,>ᴿ S) xs (y₁ , y₂) = ∃-shortest λ xs₁ → ∃[ xs₂ ] xs₁ ++ xs₂ ≡ xs × R xs₁ y₁ × S xs₂ y₂
 
 ⊎-cong : ∀ {P P′ Q Q′} → P <-> P′ → Q <-> Q′ → (P ⊎ Q) <-> (P′ ⊎ Q′)
 ⊎-cong (f , f′) (g , g′) = Sum.map f g , Sum.map f′ g′
@@ -149,30 +149,30 @@ _◁ᴿ_ : (A → Set) → Lang B → Lang (A × B)
 ⌊_⌋ᴿ : Lang A → A → Set
 ⌊ R ⌋ᴿ y = R [] y
 
-δ-·ᴿ : (R : Lang A) → (S : Lang B) → (x : Token) →
-  δᴿ (R ·ᴿ S) x ⇔ ((⌊ R ⌋ᴿ ◁ᴿ δᴿ S x) <∣>ᴿ δᴿ R x ·ᴿ S)
-δ-·ᴿ R S x xs .to (ex-shortest [] (xs₂ , refl , Req , Seq) sw) = inj₁ (Req , Seq)
-δ-·ᴿ R S x xs .to (ex-shortest (x ∷ xs₁) (xs₂ , refl , Req , Seq) sw) = inj₂ λ where
+δ-<,>ᴿ : (R : Lang A) → (S : Lang B) → (x : Token) →
+  δᴿ (R <,>ᴿ S) x ⇔ ((⌊ R ⌋ᴿ ◁ᴿ δᴿ S x) <∣>ᴿ δᴿ R x <,>ᴿ S)
+δ-<,>ᴿ R S x xs .to (ex-shortest [] (xs₂ , refl , Req , Seq) sw) = inj₁ (Req , Seq)
+δ-<,>ᴿ R S x xs .to (ex-shortest (x ∷ xs₁) (xs₂ , refl , Req , Seq) sw) = inj₂ λ where
   .proj₁ → ?
   .proj₂ .witness → ?
   .proj₂ .P-witness → ?
   .proj₂ .shortest → ?
-δ-·ᴿ R S x xs .from = ?
+δ-<,>ᴿ R S x xs .from = ?
 
-⟦[_<∣>_·_]⟧ : (R : Parser (A × B)) → (S : Parser A) → (T : Parser B) →
-  ⟦ [ R <∣> S · T ] ⟧ ⇔ ⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ ·ᴿ ⟦ T ⟧)
-⟦[ R <∣> S · T ]⟧ [] {y@(y₁ , y₂)} = begin
+⟦[_<∣>_<,>_]⟧ : (R : Parser (A × B)) → (S : Parser A) → (T : Parser B) →
+  ⟦ [ R <∣> S <,> T ] ⟧ ⇔ ⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ <,>ᴿ ⟦ T ⟧)
+⟦[ R <∣> S <,> T ]⟧ [] {y@(y₁ , y₂)} = begin
   (⌊ R ⌋ Maybe.<∣> Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y) ∼⟨ <∣>-just ⌊ R ⌋ _ ⟩
   (⌊ R ⌋ ≡ just y ⊎ is-not-just ⌊ R ⌋ × Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y)
   ∼⟨ ⊎-cong <->-refl (×-cong <->-refl (<->-trans (zip-just _ _) sigma-++-nil)) ⟩
-  ((⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ ·ᴿ ⟦ T ⟧)) [] y) ∎
+  ((⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ <,>ᴿ ⟦ T ⟧)) [] y) ∎
   where open <->-Reasoning
-⟦[ R <∣> S · T ]⟧ (x ∷ xs) {y@(y₁ , y₂)} = begin
-  (⟦ [ (δ R x <∣> (⌊ S ⌋ ◁ δ T x)) <∣> δ S x · T ] ⟧ xs y)
-  ∼⟨ ⟦[ (δ R x <∣> (⌊ S ⌋ ◁ δ T x)) <∣> δ S x · T ]⟧ xs {y} ⟩
+⟦[ R <∣> S <,> T ]⟧ (x ∷ xs) {y@(y₁ , y₂)} = begin
+  (⟦ [ (δ R x <∣> (⌊ S ⌋ ◁ δ T x)) <∣> δ S x <,> T ] ⟧ xs y)
+  ∼⟨ ⟦[ (δ R x <∣> (⌊ S ⌋ ◁ δ T x)) <∣> δ S x <,> T ]⟧ xs {y} ⟩
   _  ∼⟨ ? ⟩
-  ((δᴿ ⟦ R ⟧ x <∣>ᴿ δᴿ (⟦ S ⟧ ·ᴿ ⟦ T ⟧) x) xs y) ≡⟨⟩
-  (δᴿ (⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ ·ᴿ ⟦ T ⟧)) x xs y) ≡⟨⟩
-  ((⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ ·ᴿ ⟦ T ⟧)) (x ∷ xs) y) ∎
+  ((δᴿ ⟦ R ⟧ x <∣>ᴿ δᴿ (⟦ S ⟧ <,>ᴿ ⟦ T ⟧) x) xs y) ≡⟨⟩
+  (δᴿ (⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ <,>ᴿ ⟦ T ⟧)) x xs y) ≡⟨⟩
+  ((⟦ R ⟧ <∣>ᴿ (⟦ S ⟧ <,>ᴿ ⟦ T ⟧)) (x ∷ xs) y) ∎
   where open <->-Reasoning
 
