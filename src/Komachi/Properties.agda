@@ -1,5 +1,6 @@
 module Komachi.Properties (Token : Set) where
 
+open import Function.Base using (_$_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Maybe.Base as Maybe using (Maybe; just; nothing)
@@ -24,6 +25,13 @@ private variable
 ⟦⟧?-[] : (R : Parser? A) (y : A) → ⟦ R ⟧? ∋[ [] , y ] ↔ ⌊ R ⌋? ≡ just y
 ⟦⟧?-[] nothing y = ↔-refl
 ⟦⟧?-[] (just y′) y = ↔-refl
+
+⟦δ_⟧ : ∀ (R : Parser A) {x} → ⟦ δ R x ⟧? ⇔ δᴸ ⟦ R ⟧ x
+⟦δ R ⟧ = ⇔-refl
+
+⟦δ?_⟧ : ∀ (R : Parser? A) {x} → ⟦ δ? R x ⟧? ⇔ δᴸ ⟦ R ⟧? x
+⟦δ? nothing ⟧ xs = (λ()) , (λ())
+⟦δ? just y ⟧ xs = ↔-refl
 
 ⟦∅⟧ : ⟦ ∅ ⟧ ⇔ ∅ᴸ {A}
 ⟦∅⟧ [] .to ()
@@ -68,20 +76,24 @@ is-not-just-⌊ just R ⌋? = ↔-refl
   (⌊ R ⌋? Maybe.<∣> Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y)
   ∼⟨ <∣>-just ⌊ R ⌋? _ ⟩
   (⌊ R ⌋? ≡ just y ⊎ is-not-just ⌊ R ⌋? × Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y)
-  ∼⟨ ↔-sym (⟦⟧?-[] R y) ↔-⊎ (is-not-just-⌊ R ⌋? ↔-× (↔-trans (zip-just _ _) ?)) ⟩
+  ∼⟨ ↔-sym (⟦⟧?-[] R y) ↔-⊎ (is-not-just-⌊ R ⌋? ↔-× (↔-trans (zip-just _ _) (<,>∋[] ⟦ S ⟧ ⟦ T ⟧))) ⟩
   ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) ∋[ [] , y ]) ∎
   where open ↔-Reasoning
 
 ⟦[ R <∣> S <,> T ]⟧ (x ∷ xs) {y} = begin
-  (⟦ [ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ] ⟧? ∋[ xs , y ])
-  ∼⟨ ⟦[ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ]⟧ xs {y} ⟩
-  ((⟦ δ? R x <∣>? (⌊ S ⌋ ◁? δ T x) ⟧? <∣>ᴸ (⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧)) ∋[ xs , y ])
-  ∼⟨ ? ⟩
-  ?
-  ∼⟨ (? ⇔-<∣>ᴸ ?) xs ⟩
-  ((δᴸ ⟦ R ⟧? x <∣>ᴸ δᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧) x) ∋[ xs , y ]) ≡⟨⟩
-  (δᴸ (⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) x ∋[ xs , y ]) ≡⟨⟩
-  ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) ∋[ x ∷ xs , y ]) ∎
+  ⟦ [ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ] ⟧? ∋[ xs , y ]
+  ∼⟨ ⟦[ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ]⟧ xs ⟩
+  ⟦ δ? R x <∣>? (⌊ S ⌋ ◁? δ T x) ⟧? <∣>ᴸ ⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧
+  ⇔⟨ ⟦ δ? R x <∣>? _ ⟧⇔ ⇔-<∣>ᴸ ⇔-refl ⟩
+  ⟦ δ? R x ⟧? <∣>ᴸ ⟦ ⌊ S ⌋ ◁? δ T x ⟧? <∣>ᴸ ⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧
+  ⇔⟨ <∣>ᴸ-assoc _ _ _ ⟩
+  ⟦ δ? R x ⟧? <∣>ᴸ (⟦ ⌊ S ⌋ ◁? δ T x ⟧? <∣>ᴸ ⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧)
+  ⇔⟨ ⇔-refl ⇔-<∣>ᴸ (? ⇔-<∣>ᴸ ⇔-refl) ⟩
+  ⟦ δ? R x ⟧? <∣>ᴸ ((⌊ ⟦ S ⟧ ⌋ᴸ ◁ᴸ δᴸ ⟦ T ⟧ x) <∣>ᴸ δᴸ ⟦ S ⟧ x <,>ᴸ ⟦ T ⟧)
+  ⇔⟨ ⟦δ? R ⟧ ⇔-<∣>ᴸ ⇔-sym (δ-<,>ᴸ ⟦ S ⟧ ⟦ T ⟧ x) ⟩
+  δᴸ ⟦ R ⟧? x <∣>ᴸ δᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧) x ∋[ xs , y ]
+  ≡⟨⟩
+  δᴸ (⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) x ∋[ xs , y ] ∎
   where open ↔-Reasoning
 
 ⟦[ R <∣> nothing ?<,> T ]⟧ xs .to = inj₁

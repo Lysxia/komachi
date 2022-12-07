@@ -1,11 +1,13 @@
 -- Logical equivalence
 module Komachi.Equiv where
 
+open import Algebra.Definitions
 open import Function.Base using (_∘_)
-open import Data.Sum.Base as Sum using (_⊎_)
+open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Product as Prod using (_×_; _,_)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary using (Reflexive; Symmetric; Transitive; _Preserves_⟶_; _Preserves₂_⟶_⟶_)
+import Relation.Binary.Reasoning.Base.Single as Reasoning
 
 infix 1 _↔_
 infixr 4 _,_
@@ -28,7 +30,6 @@ open _↔_ public
 ↔-trans : Transitive _↔_
 ↔-trans (f₁ , f₂) (g₁ , g₂) = g₁ ∘ f₁ , f₂ ∘ g₂
 
-import Relation.Binary.Reasoning.Base.Single as Reasoning
 module ↔-Reasoning = Reasoning {A = Set} _↔_ ↔-refl ↔-trans
 
 _↔-⊎_ : _⊎_ Preserves₂ _↔_ ⟶ _↔_ ⟶ _↔_
@@ -43,3 +44,9 @@ _↔-×_ : _×_ Preserves₂ _↔_ ⟶ _↔_ ⟶ _↔_
 ↔-¬_ : ¬_ Preserves _↔_ ⟶ _↔_
 ↔-¬ (f , f′) = (_∘ f′ , _∘ f)
 
+⊎-assoc : Associative _↔_ _⊎_
+⊎-assoc P Q R = Sum.assocʳ , Sum.assocˡ 
+
+×-distribˡ-⊎ : _DistributesOverˡ_ _↔_ _×_ _⊎_
+×-distribˡ-⊎ P Q R .to (p , qr) = Sum.map (p ,_) (p ,_) qr
+×-distribˡ-⊎ P Q R .from = Sum.[ Prod.map₂ inj₁ , Prod.map₂ inj₂ ]
