@@ -14,8 +14,7 @@ open import Data.Product as Prod using (∃-syntax; _×_; _,_; proj₁; proj₂;
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
-open import Relation.Binary.Core using (REL)
-open import Relation.Binary.Definitions using (Reflexive; Symmetric; Transitive)
+open import Relation.Binary using (REL; Reflexive; Symmetric; Transitive; _Preserves₂_⟶_⟶_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 private variable
@@ -147,3 +146,14 @@ _◁ᴸ_ : (A → Set) → Lang B → Lang (A × B)
   .proj₂ .P-witness → ?
   .proj₂ .shortest → ?
 δ-<,>ᴸ R S x xs .from = ?
+
+_⇔-∪ᴸ_ : _∪ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
+(R⇔ ⇔-∪ᴸ S⇔) xs .to = Sum.map (R⇔ xs .to) (S⇔ xs .to)
+(R⇔ ⇔-∪ᴸ S⇔) xs .from = Sum.map (R⇔ xs .from) (S⇔ xs .from)
+
+_⇔--ᴸ_ : _-ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
+_⇔--ᴸ_ = ?
+
+
+_⇔-<∣>ᴸ_ : _<∣>ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
+R⇔ ⇔-<∣>ᴸ S⇔ = R⇔ ⇔-∪ᴸ (S⇔ ⇔--ᴸ R⇔)
