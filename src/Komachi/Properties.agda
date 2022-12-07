@@ -8,19 +8,20 @@ open import Data.Product as Prod using (∃-syntax; _×_; _,_; proj₁; proj₂;
 open import Relation.Nullary using (¬_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Komachi.Base Token
+open import Komachi.Equiv
 open import Komachi.Language Token
+open import Komachi.Base Token
 
 private variable
   A B : Set
 
 ⟦_⟧ : Parser A → Lang A
-⟦ R ⟧ xs y = parse R xs ≡ just y
+⟦ R ⟧ ∋[ xs , y ] = parse R xs ≡ just y
 
 ⟦_⟧? : Parser? A → Lang A
-⟦ R ⟧? xs y = parse? R xs ≡ just y
+⟦ R ⟧? ∋[ xs , y ] = parse? R xs ≡ just y
 
-⟦⟧?-[] : (R : Parser? A) (y : A) → ⟦ R ⟧? [] y ↔ ⌊ R ⌋? ≡ just y
+⟦⟧?-[] : (R : Parser? A) (y : A) → ⟦ R ⟧? ∋[ [] , y ] ↔ ⌊ R ⌋? ≡ just y
 ⟦⟧?-[] nothing y = ↔-refl
 ⟦⟧?-[] (just y′) y = ↔-refl
 
@@ -35,10 +36,10 @@ private variable
 ⟦ε⟧ xs .from refl = refl
 
 ⟦⌈_⌉⟧ : (y : Maybe A) → ⟦ ⌈ y ⌉ ⟧ ⇔ ⌈ y ⌉ᴸ
-⟦⌈ just y ⌉⟧ [] .to refl = ⌈just y ⌉ᴸ
+⟦⌈ just y ⌉⟧ [] .to refl = ⌈just⌉ᴸ∋
 ⟦⌈ y ⌉⟧ (x ∷ xs) .to ()
 ⟦⌈ nothing ⌉⟧ [] .to ()
-⟦⌈ .(just y) ⌉⟧ xs .from ⌈just y ⌉ᴸ = refl
+⟦⌈ (just y) ⌉⟧ xs .from ⌈just⌉ᴸ∋ = refl
 
 ⟦_<∣>_⟧⇔ : (R S : Parser A) → ⟦ R <∣> S ⟧ ⇔ ⟦ R ⟧ <∣>ᴸ ⟦ S ⟧
 ⟦_<∣>?_⟧⇔ : (R S : Parser? A) → ⟦ R <∣>? S ⟧? ⇔ ⟦ R ⟧? <∣>ᴸ ⟦ S ⟧?
@@ -53,7 +54,7 @@ private variable
 ⟦ just R <∣>? just S ⟧⇔ = ⟦ R <∣> S ⟧⇔
 
 is-not-just-⌊_⌋? : (R : Parser? A) →
-  is-not-just ⌊ R ⌋? ↔ (∀ {y} → ¬ ⟦ R ⟧? [] y)
+  is-not-just ⌊ R ⌋? ↔ [] ∉ ⟦ R ⟧?
 is-not-just-⌊ nothing ⌋? .to _ ()
 is-not-just-⌊ nothing ⌋? .from _ ()
 is-not-just-⌊ just R ⌋? = ↔-refl
@@ -67,20 +68,20 @@ is-not-just-⌊ just R ⌋? = ↔-refl
   (⌊ R ⌋? Maybe.<∣> Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y)
   ∼⟨ <∣>-just ⌊ R ⌋? _ ⟩
   (⌊ R ⌋? ≡ just y ⊎ is-not-just ⌊ R ⌋? × Maybe.zip ⌊ S ⌋ ⌊ T ⌋ ≡ just y)
-  ∼⟨ ↔-sym (⟦⟧?-[] R y) ↔-⊎ (is-not-just-⌊ R ⌋? ↔-× (↔-trans (zip-just _ _) sigma-++-nil)) ⟩
-  ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) [] y) ∎
+  ∼⟨ ↔-sym (⟦⟧?-[] R y) ↔-⊎ (is-not-just-⌊ R ⌋? ↔-× (↔-trans (zip-just _ _) ?)) ⟩
+  ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) ∋[ [] , y ]) ∎
   where open ↔-Reasoning
 
 ⟦[ R <∣> S <,> T ]⟧ (x ∷ xs) {y} = begin
-  (⟦ [ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ] ⟧? xs y)
+  (⟦ [ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ] ⟧? ∋[ xs , y ])
   ∼⟨ ⟦[ (δ? R x <∣>? (⌊ S ⌋ ◁? δ T x)) <∣> δ S x ?<,> T ]⟧ xs {y} ⟩
-  ((⟦ δ? R x <∣>? (⌊ S ⌋ ◁? δ T x) ⟧? <∣>ᴸ (⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧)) xs y)
+  ((⟦ δ? R x <∣>? (⌊ S ⌋ ◁? δ T x) ⟧? <∣>ᴸ (⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧)) ∋[ xs , y ])
   ∼⟨ ? ⟩
   ?
   ∼⟨ (? ⇔-<∣>ᴸ ?) xs ⟩
-  ((δᴸ ⟦ R ⟧? x <∣>ᴸ δᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧) x) xs y) ≡⟨⟩
-  (δᴸ (⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) x xs y) ≡⟨⟩
-  ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) (x ∷ xs) y) ∎
+  ((δᴸ ⟦ R ⟧? x <∣>ᴸ δᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧) x) ∋[ xs , y ]) ≡⟨⟩
+  (δᴸ (⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) x ∋[ xs , y ]) ≡⟨⟩
+  ((⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)) ∋[ x ∷ xs , y ]) ∎
   where open ↔-Reasoning
 
 ⟦[ R <∣> nothing ?<,> T ]⟧ xs .to = inj₁
