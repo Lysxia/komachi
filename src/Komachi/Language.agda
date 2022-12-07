@@ -1,21 +1,21 @@
 -- As an abstract model of applicative parsers, we define languages as
 -- relations between strings and values of arbitrary type.
 
-{-# OPTIONS --allow-unsolved-metas #-}
 module Komachi.Language (Token : Set) where
 
 open import Level using (Level; zero)
-open import Function.Base using (_∘_; flip; _on_)
+open import Function.Base using (_∘_; flip; _on_; case_of_)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe.Base as Maybe using (Maybe; just; nothing)
 open import Data.List.Base as List using (List; []; _∷_; _++_)
+open import Data.List.Properties
 open import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix using (Prefix; []; _∷_)
 open import Data.Product as Prod using (∃-syntax; _×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
 open import Relation.Binary using (REL; _Preserves₂_⟶_⟶_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import Komachi.Equiv
 
@@ -147,18 +147,35 @@ _◁ᴸ_ : (A → Set) → Lang B → Lang (A × B)
 ⌊_⌋ᴸ : Lang A → A → Set
 ⌊ R ⌋ᴸ y = R ∋[ [] , y ]
 
+cons-[∈<,>ᴸ] : ∀ {R : Lang A} {S : Lang B} {xs} {x} → [ xs ∈ δᴸ R x <,>ᴸ S ] → [ x ∷ xs ∈ R <,>ᴸ S ]
+cons-[∈<,>ᴸ] {x = x}
+    [ (    xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by eq ]  -- Avoid pattern-matching here to to not get stuck
+  = [ (x ∷ xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by cong (x ∷_) eq ]
+
 δ-<,>ᴸ : (R : Lang A) → (S : Lang B) → (x : Token) →
   δᴸ (R <,>ᴸ S) x ⇔ ((⌊ R ⌋ᴸ ◁ᴸ δᴸ S x) <∣>ᴸ δᴸ R x <,>ᴸ S)
+
 δ-<,>ᴸ R S x xs .to (<,>ᴸ.mk [ ([]       , y₁ , r) ++ (.x ∷ xs₂ , y₂ , s) by refl ] shortest refl) = inj₁ (r , s)
 δ-<,>ᴸ R S x xs .to (<,>ᴸ.mk [ (.x ∷ xs₁ , y₁ , r) ++ (     xs₂ , y₂ , s) by refl ] shortest refl)
   = inj₂ (no-shorter , next)
   where
+    -- ([] , _) cannot be a split of R <,>ᴸ S because we assumed that (x ∷ xs₁, xs₂) is the shortest split.
     no-shorter : ∀ {y₁ y₂} → R ∋[ [] , y₁ ] × S ∋[ x ∷ xs , y₂ ] → ⊥
-    no-shorter = ?
+    no-shorter (r′ , s′) = case shortest [ ([] , _ , r′) ++ (_ , _ , s′) by refl ] of λ()
 
     next : (δᴸ R x <,>ᴸ S) ∋[ xs₁ ++ xs₂ , (y₁ , y₂) ]
-    next = <,>ᴸ.mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl ] ? ?
-δ-<,>ᴸ R S x xs .from = ?
+    next = <,>ᴸ.mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl ]
+      (Prefix.tail ∘ shortest ∘ cons-[∈<,>ᴸ])
+      refl
+
+δ-<,>ᴸ R S x xs .from (inj₁ (r , s)) = <,>ᴸ.mk [ ([] , _ , r) ++ (x ∷ xs , _ , s) by refl ] (λ _ → []) refl
+δ-<,>ᴸ R S x xs .from (inj₂ (¬r , <,>ᴸ.mk [ (xs₁ , _ , r) ++ s@(xs₂ , _) by refl ] shortest refl))
+  = <,>ᴸ.mk [ (x ∷ xs₁ , _ , r) ++ s by refl ] shortest′ refl
+  where
+    shortest′ : (y : [ x ∷ xs₁ ++ xs₂ ∈ R <,>ᴸ S ]) → Prefix _≡_ (x ∷ xs₁) (proj₁ (prefix y))
+    shortest′ [ ([] , _ , r′) ++ (_ , _ , s′) by refl ] = ⊥-elim (¬r (r′ , s′))
+    shortest′ [ (_ ∷ xs′ , r′) ++ s′ by eq ] with ∷-injective eq
+    ... | refl , eq′ = refl ∷ shortest [ (xs′ , r′) ++ s′ by eq′ ]
 
 _⇔-∪ᴸ_ : _∪ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
 (R⇔ ⇔-∪ᴸ S⇔) xs .to = Sum.map (R⇔ xs .to) (S⇔ xs .to)
@@ -166,7 +183,6 @@ _⇔-∪ᴸ_ : _∪ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
 
 _⇔--ᴸ_ : _-ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
 (R⇔ ⇔--ᴸ S⇔) xs = ↔-funext (↔-¬ S⇔ xs) ↔-× R⇔ xs
-
 
 _⇔-<∣>ᴸ_ : _<∣>ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
 R⇔ ⇔-<∣>ᴸ S⇔ = R⇔ ⇔-∪ᴸ (S⇔ ⇔--ᴸ R⇔)
