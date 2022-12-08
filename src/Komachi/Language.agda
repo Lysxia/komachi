@@ -18,8 +18,8 @@ open import Data.Product as Prod using (∃-syntax; Σ-syntax; _×_; _,_; proj�
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
-open import Relation.Binary using (Reflexive; Symmetric; Transitive; _Preserves₂_⟶_⟶_; _⇒_)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
+open import Relation.Binary using (Reflexive; Symmetric; Transitive; Irreflexive; _Preserves₂_⟶_⟶_; _⇒_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong; cong₂)
 import Relation.Binary.Reasoning.Base.Single as Reasoning
 
 open import Komachi.Equiv
@@ -283,10 +283,21 @@ R⇔ ⇔-<∣>ᴸ S⇔ = R⇔ ⇔-∪ᴸ (S⇔ ⇔--ᴸ R⇔)
     open ⇔-Reasoning
 
 data StrictPrefix {A : Set} : List A → List A → Set where
-  [] : ∀ {y ys} → StrictPrefix [] (y ∷ ys)
-  _∷_ : ∀ {x xs ys} → StrictPrefix xs ys → StrictPrefix (x ∷ xs) (x ∷ ys)
+  []<∷ : ∀ {y ys} → StrictPrefix [] (y ∷ ys)
+  ∷<∷ : ∀ {x xs ys} → StrictPrefix xs ys → StrictPrefix (x ∷ xs) (x ∷ ys)
 
 -- StrictPrefix xs ys = ∃[ z ] ∃[ zs ] xs ++ z ∷ zs ≡ ys
+
+StrictPrefix-irreflexive : Irreflexive _≡_ (StrictPrefix {A})
+StrictPrefix-irreflexive refl (∷<∷ r) = StrictPrefix-irreflexive refl r
+
+fromStrictPrefix : {xs ys : List A} → StrictPrefix xs ys → Prefix _≡_ xs ys
+fromStrictPrefix []<∷ = []
+fromStrictPrefix (∷<∷ sp) = refl ∷ fromStrictPrefix sp
+
+Prefix-refl : {xs : List A} → Prefix _≡_ xs xs
+Prefix-refl {xs = []} = []
+Prefix-refl {xs = x ∷ xs} = refl ∷ Prefix-refl
 
 PrefixLex : List (List A) → List (List A) → Set
 PrefixLex = Lex ⊤ _≡_ StrictPrefix
@@ -324,6 +335,23 @@ R ☆ᴸ ∋[ xs , y ] = Σ[ split ∈ [ xs ∈ R ☆ᴸ] ] values split ≡ y
 
 pattern [concat_by_and_] xs eq₁ eq₂ = [concat xs by eq₁ ] , eq₂
 
+-- Troubles in defining "minimality"
+--
+-- A first attempt was
+--   shortest : Least PrefixLex-☆ᴸ (proj₁ split)
+-- where
+--   Least _≤_ x = ∀ {y} → x ≤ y
+--
+-- The problem comes in defining the embedding
+--   mapᴸ (uncurry _∷_) (R <,>ᴸ R ★) ⊆ R ★
+-- We first get a split `rr ∈ R · R ★` to construct a split `ss ∈ R ☆`.
+--
+-- Then we must prove that `ss` is less than any other split `ss′ ∈ R ☆`.
+--
+-- Intuitively, we would like to use the minimality of `rr`.
+-- This requires us to construct, from `ss′ ∈ R ☆`, a split `rr′ ∈ R · R ★`,
+-- which contains a minimal split as the `R ★` component, which
+-- cannot be done constructively from an arbitrary split `ss′`.
 record [_,_∈_★ᴸ] (xs : List Token) (y : List A) (R : Lang A) : Set where
   constructor ★ᴸ-mk
   field
@@ -348,20 +376,39 @@ uncons↔ .to = List.uncons
 uncons↔ .from nothing = []
 uncons↔ .from (just (x , xs)) = x ∷ xs
 
-unfold-★ᴸ : (R : Lang A) → R ★ᴸ ⇔ ⌈ just [] ⌉ᴸ <∣>ᴸ mapᴸ (uncurry _∷_) (R <,>ᴸ (R ★ᴸ))
+unnullable : Lang A → Lang A
+unnullable R ∋[ xs , y ] = R ∋[ xs , y ] × ∃[ xs′ ] NE.toList xs′ ≡ xs
+
+cons-☆ᴸ : ∀ {R : Lang A} (x : Element⁺ R) {xs} → [ xs ∈ R ☆ᴸ] → [ x ₁⁻ ++ xs ∈ R ☆ᴸ]
+cons-☆ᴸ x [concat xs by eq ] = [concat (x ∷ xs) by cong (x ₁⁻ ++_) eq ]
+
+unfold-★ᴸ : (R : Lang A) → R ★ᴸ ⇔ ⌈ just [] ⌉ᴸ <∣>ᴸ mapᴸ (uncurry _∷_) (unnullable R <,>ᴸ (R ★ᴸ))
 unfold-★ᴸ R xs .to (★ᴸ-mk [concat [] by refl and refl ] shortest) = inj₁ (refl , refl)
 unfold-★ᴸ R xs {.y ∷ ys} .to (★ᴸ-mk [concat ([ x , y , r ]⁺ ∷ xss) by refl and refl ] shortest)
-  = inj₂ (non-empty , (y , ys) , <,>ᴸ-mk [ (NE.toList x , y , r) ++ xss′ by refl and refl ] no-shorter , refl)
+  = inj₂ (non-empty , (y , ys) , <,>ᴸ-mk [ (NE.toList x , y , r , x , refl) ++ xss′ by refl and refl ] no-shorter , refl)
   where
     non-empty : ∀ {ys′} → ¬ (⌈ just [] ⌉ᴸ ∋[ xs , ys′ ])
     non-empty (() , _)
 
-    no-shorter⁺ = ?
+    no-shorter⁺ : (split′ : [ List.concatMap _₁⁻ xss ∈ R ☆ᴸ]) → PrefixLex-☆ᴸ [concat xss by refl ] split′
+    no-shorter⁺ arg with shortest (cons-☆ᴸ [ x , y , r ]⁺ arg)
+    ... | this z = ⊥-elim (StrictPrefix-irreflexive refl z)
+    ... | next z zs = zs
 
     xss′ : Element (R ★ᴸ)
     xss′ = List.concatMap _₁⁻ xss , ys , ★ᴸ-mk [concat xss by refl and refl ] no-shorter⁺
 
-    no-shorter = ?
+    lemma : ∀ {xs} → [ xs ∈ unnullable R ·ᴸ R ★ᴸ ] → [ xs ∈ R ☆ᴸ]
+    lemma [ (x₁ ∷ xs₁ , y₁ , r , .x₁ ∷ .xs₁ , refl) ++ (xs₂ , y₂ , ★ᴸ-mk [concat xs₂′ by eq₂ and _ ] _) by eq ] =
+      [concat ([ x₁ ∷ xs₁ , y₁ , r ]⁺ ∷ xs₂′)
+      by trans (cong₂ _++_ refl eq₂) eq ]
+
+    no-shorter :
+      (split : [ NE.toList x ++ List.concatMap _₁⁻ xss ∈ unnullable R ·ᴸ R ★ᴸ ]) →
+      Prefix _≡_ (NE.toList x) (prefix split ₁)
+    no-shorter split@([ (x₁ ∷ xs₁ , y₁ , r , .x₁ ∷ .xs₁ , refl) ++ (xs₂ , y₂ , r★) by eq ]) with shortest (lemma split)
+    ... | this x≺y = fromStrictPrefix x≺y
+    ... | next refl z = Prefix-refl
 
 unfold-★ᴸ R xs .from (inj₁ (refl , refl)) = ★ᴸ-mk [concat [] by refl and refl ] no-shorter
   where
@@ -369,4 +416,15 @@ unfold-★ᴸ R xs .from (inj₁ (refl , refl)) = ★ᴸ-mk [concat [] by refl a
       [concat [] by _ ] → base tt
       [concat (_ ∷ _) by _ ] → halt
 
-unfold-★ᴸ R xs .from (inj₂ etc) = ★ᴸ-mk [concat ? by ? and ? ] ?
+unfold-★ᴸ R xs .from
+    (inj₂ ( non-empty
+          , (y , ys)
+          , <,>ᴸ-mk [ (_ , y₁ , r , xs₁ , refl) ++ (xs₂ , y₂ , ★ᴸ-mk [concat xs₂′ by refl and refl ] shortest★)
+                    by refl and refl ] shortest
+          , refl))
+  = ★ᴸ-mk [concat ([ xs₁ , y₁ , r ]⁺ ∷ xs₂′) by refl and refl ] no-shorter
+  where
+    no-shorter : Least PrefixLex-☆ᴸ [concat [ xs₁ , y , r ]⁺ ∷ xs₂′ by refl ]
+    no-shorter [concat [ xs₁″ , y₁″ , r″ ]⁺ ∷ chunks₁ by concat-chunks₁ ]
+        with shortest [ (_ , _ , r″ , _ , refl) ++ (_ , _ , ?) by {! !} ]
+    ... | z = ?
