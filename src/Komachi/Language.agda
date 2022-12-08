@@ -1,6 +1,7 @@
 -- As an abstract model of applicative parsers, we define languages as
 -- relations between strings and values of arbitrary type.
 
+{-# OPTIONS --allow-unsolved-metas #-}
 module Komachi.Language (Token : Set) where
 
 open import Level using (Level; zero)
@@ -9,8 +10,10 @@ open import Function using (_∘_; flip; _-⟨_⟩-_; _on_; case_of_; Morphism)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe.Base as Maybe using (Maybe; just; nothing)
 open import Data.List.Base as List using (List; []; _∷_; _++_)
+open import Data.List.NonEmpty as NE using (List⁺; _∷_)
 open import Data.List.Properties
 open import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix using (Prefix; []; _∷_)
+open import Data.List.Relation.Binary.Lex.Core
 open import Data.Product as Prod using (∃-syntax; Σ-syntax; _×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -184,14 +187,14 @@ cons-[∈·ᴸ] {x = x}
 
 δ-<,>ᴸ R S x xs .to (<,>ᴸ-mk [ ([]       , y₁ , r) ++ (.x ∷ xs₂ , y₂ , s) by refl and refl ] shortest) = inj₁ (r , s)
 δ-<,>ᴸ R S x xs .to (<,>ᴸ-mk [ (.x ∷ xs₁ , y₁ , r) ++ (     xs₂ , y₂ , s) by refl and refl ] shortest)
-  = inj₂ (no-shorter , next)
+  = inj₂ (no-shorter , step)
   where
     -- ([] , _) cannot be a split of R <,>ᴸ S because we assumed that (x ∷ xs₁, xs₂) is the shortest split.
     no-shorter : ∀ {y₁ y₂} → R ∋[ [] , y₁ ] × S ∋[ x ∷ xs , y₂ ] → ⊥
     no-shorter (r′ , s′) = case shortest [ ([] , _ , r′) ++ (_ , _ , s′) by refl ] of λ()
 
-    next : (δᴸ R x <,>ᴸ S) ∋[ xs₁ ++ xs₂ , (y₁ , y₂) ]
-    next = <,>ᴸ-mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl and refl ]
+    step : (δᴸ R x <,>ᴸ S) ∋[ xs₁ ++ xs₂ , (y₁ , y₂) ]
+    step = <,>ᴸ-mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl and refl ]
       (Prefix.tail ∘ shortest ∘ cons-[∈·ᴸ])
 
 δ-<,>ᴸ R S x xs .from (inj₁ (r , s)) = <,>ᴸ-mk [ ([] , _ , r) ++ (x ∷ xs , _ , s) by refl and refl ] (λ _ → [])
@@ -278,3 +281,92 @@ R⇔ ⇔-<∣>ᴸ S⇔ = R⇔ ⇔-∪ᴸ (S⇔ ⇔--ᴸ R⇔)
   R ∎
   where
     open ⇔-Reasoning
+
+data StrictPrefix {A : Set} : List A → List A → Set where
+  [] : ∀ {y ys} → StrictPrefix [] (y ∷ ys)
+  _∷_ : ∀ {x xs ys} → StrictPrefix xs ys → StrictPrefix (x ∷ xs) (x ∷ ys)
+
+-- StrictPrefix xs ys = ∃[ z ] ∃[ zs ] xs ++ z ∷ zs ≡ ys
+
+PrefixLex : List (List A) → List (List A) → Set
+PrefixLex = Lex ⊤ _≡_ StrictPrefix
+
+record Element⁺ (R : Lang A) : Set where
+  constructor [_,_,_]⁺
+  field
+    _₁⁺ : List⁺ Token
+
+  _₁⁻ : List Token
+  _₁⁻ = NE.toList _₁⁺
+
+  field
+    _₂⁺ : A
+    mem : R ∋[ _₁⁻ , _₂⁺ ]
+
+open Element⁺
+
+record [_∈_☆ᴸ] (xs : List Token) (R : Lang A) : Set where
+  constructor [concat_by_]
+  field
+    chunks : List (Element⁺ R)
+    concat-chunks : List.concatMap _₁⁻ chunks ≡ xs
+
+  values : List A
+  values = List.map _₂⁺ chunks
+
+open [_∈_☆ᴸ]
+
+PrefixLex-☆ᴸ : {R : Lang A} → {xs : List Token} → (_ _ : [ xs ∈ R ☆ᴸ]) → Set
+PrefixLex-☆ᴸ = PrefixLex on (List.map _₁⁻ ∘ chunks)
+
+_☆ᴸ : Lang A → Lang (List A)
+R ☆ᴸ ∋[ xs , y ] = Σ[ split ∈ [ xs ∈ R ☆ᴸ] ] values split ≡ y
+
+pattern [concat_by_and_] xs eq₁ eq₂ = [concat xs by eq₁ ] , eq₂
+
+record [_,_∈_★ᴸ] (xs : List Token) (y : List A) (R : Lang A) : Set where
+  constructor ★ᴸ-mk
+  field
+    split : R ☆ᴸ ∋[ xs , y ]
+    shortest : Least PrefixLex-☆ᴸ (proj₁ split)
+
+open [_,_∈_★ᴸ]
+
+_★ᴸ : Lang A → Lang (List A)
+R ★ᴸ ∋[ xs , y ] = [ xs , y ∈ R ★ᴸ]
+
+infix 4 _⇔⦅_⦆_ _⊆⦅_⦆_
+
+_⊆⦅_⦆_ : Lang A → (A → B) → Lang B → Set
+R ⊆⦅ f ⦆ S = ∀ xs {y} → R ∋[ xs , y ] → S ∋[ xs , f y ]
+
+_⇔⦅_⦆_ : Lang A → (A ↔ B) → Lang B → Set
+R ⇔⦅ f ⦆ S = R ⊆⦅ f .to ⦆ S × S ⊆⦅ f .from ⦆ R
+
+uncons↔ : List A ↔ Maybe (A × List A)
+uncons↔ .to = List.uncons
+uncons↔ .from nothing = []
+uncons↔ .from (just (x , xs)) = x ∷ xs
+
+unfold-★ᴸ : (R : Lang A) → R ★ᴸ ⇔ ⌈ just [] ⌉ᴸ <∣>ᴸ mapᴸ (uncurry _∷_) (R <,>ᴸ (R ★ᴸ))
+unfold-★ᴸ R xs .to (★ᴸ-mk [concat [] by refl and refl ] shortest) = inj₁ (refl , refl)
+unfold-★ᴸ R xs {.y ∷ ys} .to (★ᴸ-mk [concat ([ x , y , r ]⁺ ∷ xss) by refl and refl ] shortest)
+  = inj₂ (non-empty , (y , ys) , <,>ᴸ-mk [ (NE.toList x , y , r) ++ xss′ by refl and refl ] no-shorter , refl)
+  where
+    non-empty : ∀ {ys′} → ¬ (⌈ just [] ⌉ᴸ ∋[ xs , ys′ ])
+    non-empty (() , _)
+
+    no-shorter⁺ = ?
+
+    xss′ : Element (R ★ᴸ)
+    xss′ = List.concatMap _₁⁻ xss , ys , ★ᴸ-mk [concat xss by refl and refl ] no-shorter⁺
+
+    no-shorter = ?
+
+unfold-★ᴸ R xs .from (inj₁ (refl , refl)) = ★ᴸ-mk [concat [] by refl and refl ] no-shorter
+  where
+    no-shorter = λ where
+      [concat [] by _ ] → base tt
+      [concat (_ ∷ _) by _ ] → halt
+
+unfold-★ᴸ R xs .from (inj₂ etc) = ★ᴸ-mk [concat ? by ? and ? ] ?
