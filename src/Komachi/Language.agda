@@ -5,13 +5,13 @@ module Komachi.Language (Token : Set) where
 
 open import Level using (Level; zero)
 open import Algebra.Definitions
-open import Function using (_∘_; flip; _on_; case_of_; Morphism)
+open import Function using (_∘_; flip; _-⟨_⟩-_; _on_; case_of_; Morphism)
 open import Data.Empty using (⊥; ⊥-elim)
 open import Data.Maybe.Base as Maybe using (Maybe; just; nothing)
 open import Data.List.Base as List using (List; []; _∷_; _++_)
 open import Data.List.Properties
 open import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix using (Prefix; []; _∷_)
-open import Data.Product as Prod using (∃-syntax; _×_; _,_; proj₁; proj₂; uncurry)
+open import Data.Product as Prod using (∃-syntax; Σ-syntax; _×_; _,_; proj₁; proj₂; uncurry)
 open import Data.Sum.Base as Sum using (_⊎_; inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Relation.Nullary using (¬_)
@@ -115,30 +115,34 @@ is-not-just r = ∀ {x} → ¬ r ≡ just x
 <∣>-just nothing s .to refl = inj₂ ((λ()) , refl)
 <∣>-just nothing s .from (inj₂ (¬just , refl)) = refl
 
-record [_∈_<,>ᴸ_] (xs : List Token) (R : Lang A) (S : Lang B) : Set where
+record [_∈_·ᴸ_] (xs : List Token) (R : Lang A) (S : Lang B) : Set where
   constructor [_++_by_]
   field
     prefix : Element R
     suffix : Element S
     prefix++suffix : prefix ₁ ++ suffix ₁ ≡ xs
 
-  value : A × B
-  value = prefix ₂ , suffix ₂
+open [_∈_·ᴸ_] public
 
-open [_∈_<,>ᴸ_] public
+_·ᴸ_ : Lang A → Lang B → Lang (A × B)
+R ·ᴸ S ∋[ xs , y ] = Σ[ split ∈ [ xs ∈ R ·ᴸ S ] ] (prefix split ₂ , suffix split ₂) ≡ y
 
-Least : (A → A → Set) → A → Set
+pattern [_++_by_and_] xs₁ xs₂ ++₁ ++₂ = ([ xs₁ ++ xs₂ by ++₁ ] , ++₂)
+
+Least : (A → B → Set) → A → Set
 Least _≤_ x = ∀ y → x ≤ y
 
+Prefix-·ᴸ : ∀ {R : Lang A} {S : Lang B} {xs} → [ xs ∈ R ·ᴸ S ] → [ xs ∈ R ·ᴸ S ] → Set
+Prefix-·ᴸ = Prefix _≡_ on (_₁ ∘ prefix)
+
+record [_,_∈_<,>ᴸ_] (xs : List Token) (y : A × B) (R : Lang A) (S : Lang B) : Set where
+  constructor <,>ᴸ-mk
+  field
+    split : R ·ᴸ S ∋[ xs , y ]
+    shortest-split : Least Prefix-·ᴸ (proj₁ split)
+
 _<,>ᴸ_ : Lang A → Lang B → Lang (A × B)
-(R <,>ᴸ S) ∋[ xs , y ] = def R S xs y
-  module <,>ᴸ where 
-    record def (R : Lang A) (S : Lang B) (xs : List Token) (y : A × B) : Set where
-      constructor mk
-      field
-        split : [ xs ∈ R <,>ᴸ S ]
-        shortest-split : Least (Prefix _≡_ on (_₁ ∘ prefix)) split
-        value-split : value split ≡ y
+(R <,>ᴸ S) ∋[ xs , y ] = [ xs , y ∈ R <,>ᴸ S ]
 
 zip-just : ∀ {A} {B} {x : A} {y : B} (r : Maybe A) (s : Maybe B) →
   Maybe.zip r s ≡ just (x , y) ↔
@@ -167,19 +171,19 @@ _◁ᴸ_ : (A → Set) → Lang B → Lang (A × B)
 ⌊ R ⌋ᴸ y = R ∋[ [] , y ]
 
 <,>∋[] : ∀ (R : Lang A) (S : Lang B) {y₁ y₂} → R ∋[ [] , y₁ ] × S ∋[ [] , y₂ ] ↔ (R <,>ᴸ S) ∋[ [] , (y₁ , y₂) ]
-<,>∋[] R S .to (r , s) = <,>ᴸ.mk [ ([] , _ , r) ++ ([] , _ , s) by refl ] (λ _ → []) refl
-<,>∋[] R S .from (<,>ᴸ.mk [ ([] , _ , r) ++ ([] , _ , s) by eq ] shortest refl) = (r , s)
+<,>∋[] R S .to (r , s) = <,>ᴸ-mk [ ([] , _ , r) ++ ([] , _ , s) by refl and refl ] (λ _ → [])
+<,>∋[] R S .from (<,>ᴸ-mk [ ([] , _ , r) ++ ([] , _ , s) by eq and refl ] shortest) = (r , s)
 
-cons-[∈<,>ᴸ] : ∀ {R : Lang A} {S : Lang B} {xs} {x} → [ xs ∈ δᴸ R x <,>ᴸ S ] → [ x ∷ xs ∈ R <,>ᴸ S ]
-cons-[∈<,>ᴸ] {x = x}
+cons-[∈·ᴸ] : ∀ {R : Lang A} {S : Lang B} {xs} {x} → [ xs ∈ δᴸ R x ·ᴸ S ] → [ x ∷ xs ∈ R ·ᴸ S ]
+cons-[∈·ᴸ] {x = x}
     [ (    xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by eq ]  -- Avoid pattern-matching here to to not get stuck
   = [ (x ∷ xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by cong (x ∷_) eq ]
 
 δ-<,>ᴸ : (R : Lang A) → (S : Lang B) → (x : Token) →
   δᴸ (R <,>ᴸ S) x ⇔ ((⌊ R ⌋ᴸ ◁ᴸ δᴸ S x) <∣>ᴸ δᴸ R x <,>ᴸ S)
 
-δ-<,>ᴸ R S x xs .to (<,>ᴸ.mk [ ([]       , y₁ , r) ++ (.x ∷ xs₂ , y₂ , s) by refl ] shortest refl) = inj₁ (r , s)
-δ-<,>ᴸ R S x xs .to (<,>ᴸ.mk [ (.x ∷ xs₁ , y₁ , r) ++ (     xs₂ , y₂ , s) by refl ] shortest refl)
+δ-<,>ᴸ R S x xs .to (<,>ᴸ-mk [ ([]       , y₁ , r) ++ (.x ∷ xs₂ , y₂ , s) by refl and refl ] shortest) = inj₁ (r , s)
+δ-<,>ᴸ R S x xs .to (<,>ᴸ-mk [ (.x ∷ xs₁ , y₁ , r) ++ (     xs₂ , y₂ , s) by refl and refl ] shortest)
   = inj₂ (no-shorter , next)
   where
     -- ([] , _) cannot be a split of R <,>ᴸ S because we assumed that (x ∷ xs₁, xs₂) is the shortest split.
@@ -187,17 +191,16 @@ cons-[∈<,>ᴸ] {x = x}
     no-shorter (r′ , s′) = case shortest [ ([] , _ , r′) ++ (_ , _ , s′) by refl ] of λ()
 
     next : (δᴸ R x <,>ᴸ S) ∋[ xs₁ ++ xs₂ , (y₁ , y₂) ]
-    next = <,>ᴸ.mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl ]
-      (Prefix.tail ∘ shortest ∘ cons-[∈<,>ᴸ])
-      refl
+    next = <,>ᴸ-mk [ (xs₁ , y₁ , r) ++ (xs₂ , y₂ , s) by refl and refl ]
+      (Prefix.tail ∘ shortest ∘ cons-[∈·ᴸ])
 
-δ-<,>ᴸ R S x xs .from (inj₁ (r , s)) = <,>ᴸ.mk [ ([] , _ , r) ++ (x ∷ xs , _ , s) by refl ] (λ _ → []) refl
-δ-<,>ᴸ R S x xs .from (inj₂ (¬r , <,>ᴸ.mk [ (xs₁ , _ , r) ++ s@(xs₂ , _) by refl ] shortest refl))
-  = <,>ᴸ.mk [ (x ∷ xs₁ , _ , r) ++ s by refl ] shortest′ refl
+δ-<,>ᴸ R S x xs .from (inj₁ (r , s)) = <,>ᴸ-mk [ ([] , _ , r) ++ (x ∷ xs , _ , s) by refl and refl ] (λ _ → [])
+δ-<,>ᴸ R S x xs .from (inj₂ (¬r , <,>ᴸ-mk [ (xs₁ , _ , r) ++ s@(xs₂ , _) by refl and refl ] shortest))
+  = <,>ᴸ-mk [ (x ∷ xs₁ , _ , r) ++ s by refl and refl ] shortest′
   where
-    shortest′ : (y : [ x ∷ xs₁ ++ xs₂ ∈ R <,>ᴸ S ]) → Prefix _≡_ (x ∷ xs₁) (proj₁ (prefix y))
+    shortest′ : (split′ : [ x ∷ xs₁ ++ xs₂ ∈ R ·ᴸ S ]) → Prefix _≡_ (x ∷ xs₁) (prefix split′ ₁)
     shortest′ [ ([] , _ , r′) ++ (_ , _ , s′) by refl ] = ⊥-elim (¬r (r′ , s′))
-    shortest′ [ (_ ∷ xs′ , r′) ++ s′ by eq ] with ∷-injective eq
+    shortest′ [ (_ ∷ xs′ , r′) ++ s′ by eq₁ ] with ∷-injective eq₁
     ... | refl , eq′ = refl ∷ shortest [ (xs′ , r′) ++ s′ by eq′ ]
 
 _⊆_ : Lang A → Lang A → Set
@@ -209,20 +212,18 @@ R ⊆ S = ∀ xs {y} → R ∋[ xs , y ] → S ∋[ xs , y ]
 ⇔-⊇ : _⇔_ {A} ⇒ flip _⊆_
 ⇔-⊇ R⇔ xs = R⇔ xs .from
 
-[_∈_⊆-<,>ᴸ_] : ∀ xs → [_∈_<,>ᴸ_] {A} {B} xs Preserves₂ _⊆_ ⟶ _⊆_ ⟶ Morphism
-[ xs ∈ R⊆ ⊆-<,>ᴸ S⊆ ]
-    [ (xs₁ , y₁ ,        r) ++ (xs₂ , y₂ ,        s) by eq ]
-  = [ (xs₁ , y₁ , R⊆ xs₁ r) ++ (xs₂ , y₂ , S⊆ xs₂ s) by eq ]
+[_∈_⊆-·ᴸ_] : ∀ xs → [_∈_·ᴸ_] {A} {B} xs Preserves₂ _⊆_ ⟶ _⊆_ ⟶ Morphism
+[ xs ∈ R⊆ ⊆-·ᴸ S⊆ ]
+    [ (xs₁ , y₁ ,        r) ++ (xs₂ , y₂ ,        s) by eq₁ ]
+  = [ (xs₁ , y₁ , R⊆ xs₁ r) ++ (xs₂ , y₂ , S⊆ xs₂ s) by eq₁ ]
 
 _⇔-<,>ᴸ_ : _<,>ᴸ_ {A} {B} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
-_⇔-<,>ᴸ_ R⇔ S⇔ xs .to (<,>ᴸ.mk split shortest value-split)
-  = <,>ᴸ.mk ([ xs ∈ ⇔-⊆ R⇔ ⊆-<,>ᴸ ⇔-⊆ S⇔ ] split)
-            (shortest ∘ [ xs ∈ ⇔-⊇ R⇔ ⊆-<,>ᴸ ⇔-⊇ S⇔ ])
-            value-split
-_⇔-<,>ᴸ_ R⇔ S⇔ xs .from (<,>ᴸ.mk split shortest value-split)
-  = <,>ᴸ.mk ([ xs ∈ ⇔-⊇ R⇔ ⊆-<,>ᴸ ⇔-⊇ S⇔ ] split)
-            (shortest ∘ [ xs ∈ ⇔-⊆ R⇔ ⊆-<,>ᴸ ⇔-⊆ S⇔ ])
-            value-split
+_⇔-<,>ᴸ_ R⇔ S⇔ xs .to (<,>ᴸ-mk (split , eq₂) shortest)
+  = <,>ᴸ-mk ([ xs ∈ ⇔-⊆ R⇔ ⊆-·ᴸ ⇔-⊆ S⇔ ] split , eq₂)
+            (shortest ∘ [ xs ∈ ⇔-⊇ R⇔ ⊆-·ᴸ ⇔-⊇ S⇔ ])
+_⇔-<,>ᴸ_ R⇔ S⇔ xs .from (<,>ᴸ-mk (split , eq₂) shortest)
+  = <,>ᴸ-mk ([ xs ∈ ⇔-⊇ R⇔ ⊆-·ᴸ ⇔-⊇ S⇔ ] split , eq₂)
+            (shortest ∘ [ xs ∈ ⇔-⊆ R⇔ ⊆-·ᴸ ⇔-⊆ S⇔ ])
 
 _⇔-∪ᴸ_ : _∪ᴸ_ {A} Preserves₂ _⇔_ ⟶ _⇔_ ⟶ _⇔_
 (R⇔ ⇔-∪ᴸ S⇔) xs .to = Sum.map (R⇔ xs .to) (S⇔ xs .to)
