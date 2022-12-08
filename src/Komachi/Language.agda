@@ -84,6 +84,9 @@ module ⇔-Reasoning {A : Set} = Reasoning {A = Lang A} _⇔_ ⇔-refl ⇔-trans
 εᴸ : Lang ⊤
 εᴸ ∋[ xs , _ ] = [] ≡ xs
 
+⌈_⌉ᴹ : Maybe A → A → Set
+⌈ y′ ⌉ᴹ y = y′ ≡ just y
+
 ⌈_⌉ᴸ : Maybe A → Lang A
 ⌈ y′ ⌉ᴸ ∋[ xs , y ] = xs ≡ [] × y′ ≡ just y
 
@@ -153,6 +156,9 @@ zip-just (just x) (just y) = (λ{ refl → refl , refl }) , (λ{ (refl , refl) �
 
 mapᴸ : (A → B) → Lang A → Lang B
 mapᴸ f R ∋[ xs , y ] = ∃[ x ] R ∋[ xs , x ] × f x ≡ y
+
+mapMaybeᴸ : (A → Maybe B) → Lang A → Lang B
+mapMaybeᴸ f R ∋[ xs , y ] = ∃[ x ] R ∋[ xs , x ] × f x ≡ just y
 
 _◁ᴸ_ : (A → Set) → Lang B → Lang (A × B)
 (P ◁ᴸ R) ∋[ xs , (x , y) ] = P x × R ∋[ xs , y ]
@@ -255,3 +261,19 @@ R⇔ ⇔-<∣>ᴸ S⇔ = R⇔ ⇔-∪ᴸ (S⇔ ⇔--ᴸ R⇔)
 
     open ⇔-Reasoning
 
+∪ᴸ-identityˡ : LeftIdentity (_⇔_ {A}) ∅ᴸ _∪ᴸ_
+∪ᴸ-identityˡ R xs .to (inj₂ y) = y
+∪ᴸ-identityˡ R xs .from = inj₂
+
+-ᴸ-identityʳ : RightIdentity (_⇔_ {A}) ∅ᴸ _-ᴸ_
+-ᴸ-identityʳ R xs .to (_ , y) = y
+-ᴸ-identityʳ R xs .from y = (λ()) , y
+
+<∣>ᴸ-identityˡ : LeftIdentity (_⇔_ {A}) ∅ᴸ _<∣>ᴸ_
+<∣>ᴸ-identityˡ R = begin
+  ∅ᴸ <∣>ᴸ R ≡⟨⟩
+  ∅ᴸ ∪ᴸ (R -ᴸ ∅ᴸ) ∼⟨ ∪ᴸ-identityˡ (R -ᴸ ∅ᴸ) ⟩
+  (R -ᴸ ∅ᴸ) ∼⟨ -ᴸ-identityʳ R ⟩
+  R ∎
+  where
+    open ⇔-Reasoning

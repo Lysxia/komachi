@@ -67,6 +67,30 @@ is-not-just-⌊ nothing ⌋? .to _ ()
 is-not-just-⌊ nothing ⌋? .from _ ()
 is-not-just-⌊ just R ⌋? = ↔-refl
 
+⟦_◁_⟧⇔ : (y : Maybe A) → (R : Parser B) →
+  ⟦ y ◁ R ⟧ ⇔ (⌈ y ⌉ᴹ ◁ᴸ ⟦ R ⟧)
+⟦ nothing ◁ R ⟧⇔ [] = (λ()) , λ{(() , _)}
+⟦ nothing ◁ R ⟧⇔ (_ ∷ _) = (λ()) , λ{(() , _)}
+⟦ just y ◁ R ⟧⇔ [] with ⌊ R ⌋
+... | nothing = (λ()) , λ{(_ , ())}
+... | just z = (λ{ refl → refl , refl }) , (λ{ (refl , refl) → refl })
+⟦ just y ◁ R ⟧⇔ (x ∷ xs) with δ R x
+... | nothing = (λ()) , λ{(_ , ())}
+... | just R′ = ⟦ just y ◁ R′ ⟧⇔ xs
+
+⟦_◁?_⟧⇔ : (y : Maybe A) → (R : Parser? B) →
+  ⟦ y ◁? R ⟧? ⇔ (⌈ y ⌉ᴹ ◁ᴸ ⟦ R ⟧?)
+⟦ nothing ◁? R ⟧⇔ _ = (λ()) , (λ{(() , _)})
+⟦ just y ◁? nothing ⟧⇔ _ =  (λ()) , (λ{(_ , ())})
+⟦ just y ◁? just R ⟧⇔ = ⟦ just y ◁ R ⟧⇔
+
+⟦⌊_⌋◁?_⟧ : (R : Parser A) → (S : Parser? B) →
+  ⟦ ⌊ R ⌋ ◁? S ⟧? ⇔ ⌊ ⟦ R ⟧ ⌋ᴸ ◁ᴸ ⟦ S ⟧?
+⟦⌊ R ⌋◁? S ⟧ xs with ⌊ R ⌋ | S
+... | nothing | S = (λ()) , λ{ (() , _) }
+... | just _ | nothing = (λ()) , λ{ (_ , ()) }
+... | just y | just S = ⟦ just y ◁ S ⟧⇔ xs
+
 ⟦[_<∣>_<,>_]⟧ : (R : Parser? (A × B)) → (S : Parser A) → (T : Parser B) →
   ⟦ [ R <∣> S <,> T ] ⟧ ⇔ ⟦ R ⟧? <∣>ᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧)
 ⟦[_<∣>_?<,>_]⟧ : (R : Parser? (A × B)) → (S : Parser? A) → (T : Parser B) →
@@ -88,7 +112,7 @@ is-not-just-⌊ just R ⌋? = ↔-refl
   ⟦ δ? R x ⟧? <∣>ᴸ ⟦ ⌊ S ⌋ ◁? δ T x ⟧? <∣>ᴸ ⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧
   ⇔⟨ <∣>ᴸ-assoc _ _ _ ⟩
   ⟦ δ? R x ⟧? <∣>ᴸ (⟦ ⌊ S ⌋ ◁? δ T x ⟧? <∣>ᴸ ⟦ δ S x ⟧? <,>ᴸ ⟦ T ⟧)
-  ⇔⟨ ⇔-refl ⇔-<∣>ᴸ (? ⇔-<∣>ᴸ ⇔-refl) ⟩
+  ⇔⟨ ⇔-refl ⇔-<∣>ᴸ (⟦⌊ S ⌋◁? δ T x ⟧ ⇔-<∣>ᴸ ⇔-refl) ⟩
   ⟦ δ? R x ⟧? <∣>ᴸ ((⌊ ⟦ S ⟧ ⌋ᴸ ◁ᴸ δᴸ ⟦ T ⟧ x) <∣>ᴸ δᴸ ⟦ S ⟧ x <,>ᴸ ⟦ T ⟧)
   ⇔⟨ ⟦δ? R ⟧ ⇔-<∣>ᴸ ⇔-sym (δ-<,>ᴸ ⟦ S ⟧ ⟦ T ⟧ x) ⟩
   δᴸ ⟦ R ⟧? x <∣>ᴸ δᴸ (⟦ S ⟧ <,>ᴸ ⟦ T ⟧) x ∋[ xs , y ]
@@ -99,3 +123,16 @@ is-not-just-⌊ just R ⌋? = ↔-refl
 ⟦[ R <∣> nothing ?<,> T ]⟧ xs .to = inj₁
 ⟦[ R <∣> nothing ?<,> T ]⟧ xs .from (inj₁ eq) = eq
 ⟦[ R <∣> just S ?<,> T ]⟧ = ⟦[ R <∣> S <,> T ]⟧
+
+⟦nothing⟧ : ⟦ nothing {A = Parser A} ⟧? ⇔ ∅ᴸ
+⟦nothing⟧ [] = (λ()) , (λ())
+⟦nothing⟧ (_ ∷ _) = (λ()) , (λ())
+
+⟦_<,>_⟧⇔ : (R : Parser A) → (S : Parser B) →
+  ⟦ R <,> S ⟧ ⇔ ⟦ R ⟧ <,>ᴸ ⟦ S ⟧
+⟦ R <,> S ⟧⇔ = begin
+  ⟦ [ nothing <∣> R <,> S ] ⟧ ∼⟨ ⟦[ nothing <∣> R <,> S ]⟧ ⟩
+  ⟦ nothing ⟧? <∣>ᴸ ⟦ R ⟧ <,>ᴸ ⟦ S ⟧ ∼⟨ ⟦nothing⟧ ⇔-<∣>ᴸ ⇔-refl ⟩
+  ∅ᴸ <∣>ᴸ ⟦ R ⟧ <,>ᴸ ⟦ S ⟧ ∼⟨ <∣>ᴸ-identityˡ _ ⟩
+  ⟦ R ⟧ <,>ᴸ ⟦ S ⟧ ∎
+  where open ⇔-Reasoning
